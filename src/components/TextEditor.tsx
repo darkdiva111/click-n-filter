@@ -4,12 +4,34 @@ import React, { useState } from 'react';
 interface TextEditorProps {
   onAddText: (text: { content: string; x: number; y: number; color: string; fontSize: number }) => void;
   onCancel: () => void;
+  initialText?: { content: string; x: number; y: number; color: string; fontSize: number };
 }
 
-const TextEditor: React.FC<TextEditorProps> = ({ onAddText, onCancel }) => {
-  const [text, setText] = useState('');
-  const [color, setColor] = useState('#ffffff');
-  const [fontSize, setFontSize] = useState(24);
+const TextEditor: React.FC<TextEditorProps> = ({ onAddText, onCancel, initialText }) => {
+  const [text, setText] = useState(initialText?.content || '');
+  const [color, setColor] = useState(initialText?.color || '#ffffff');
+  const [fontSize, setFontSize] = useState(initialText?.fontSize || 24);
+  const [fontStyle, setFontStyle] = useState('normal'); // normal, italic, bold, bold-italic
+  
+  const fontStyles = [
+    { id: 'normal', label: 'Normal', style: 'normal', weight: 'normal' },
+    { id: 'italic', label: 'Italic', style: 'italic', weight: 'normal' },
+    { id: 'bold', label: 'Bold', style: 'normal', weight: 'bold' },
+    { id: 'bold-italic', label: 'Bold Italic', style: 'italic', weight: 'bold' }
+  ];
+  
+  const textColors = [
+    '#ffffff', // white
+    '#000000', // black
+    '#ff0000', // red
+    '#00ff00', // green
+    '#0000ff', // blue
+    '#ffff00', // yellow
+    '#ff00ff', // magenta
+    '#00ffff', // cyan
+    '#ffa500', // orange
+    '#800080'  // purple
+  ];
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,40 +70,75 @@ const TextEditor: React.FC<TextEditorProps> = ({ onAddText, onCancel }) => {
           />
         </div>
         
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="color" className="block text-sm font-medium text-booth-muted mb-1">
-              Text Color
-            </label>
-            <div className="flex items-center space-x-2">
+        <div>
+          <label className="block text-sm font-medium text-booth-muted mb-1">
+            Font Style
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {fontStyles.map(style => (
+              <button
+                key={style.id}
+                type="button"
+                className={`px-3 py-1 rounded-md text-sm transition-all ${
+                  fontStyle === style.id
+                    ? 'bg-booth-accent text-white'
+                    : 'bg-booth-secondary/40 text-booth-primary hover:bg-booth-secondary/60'
+                }`}
+                onClick={() => setFontStyle(style.id)}
+                style={{
+                  fontStyle: style.style,
+                  fontWeight: style.weight
+                }}
+              >
+                {style.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-booth-muted mb-1">
+            Text Color
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {textColors.map((textColor, index) => (
+              <button
+                key={index}
+                type="button"
+                className={`
+                  w-8 h-8 rounded-full transition-all
+                  ${color === textColor ? 'ring-2 ring-booth-accent ring-offset-2 scale-110' : 'hover:scale-105'}
+                `}
+                style={{ backgroundColor: textColor }}
+                onClick={() => setColor(textColor)}
+                aria-label={`Color ${index + 1}`}
+              />
+            ))}
+            <div className="flex items-center">
               <input
                 type="color"
-                id="color"
-                className="h-8 w-8 cursor-pointer"
+                id="customColor"
+                className="h-8 w-8 cursor-pointer rounded-full"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
               />
-              <span className="text-sm text-booth-muted">{color}</span>
             </div>
           </div>
-          
-          <div>
-            <label htmlFor="fontSize" className="block text-sm font-medium text-booth-muted mb-1">
-              Font Size
-            </label>
-            <div className="flex items-center space-x-2">
-              <input
-                type="range"
-                id="fontSize"
-                min="12"
-                max="48"
-                className="w-full"
-                value={fontSize}
-                onChange={(e) => setFontSize(parseInt(e.target.value))}
-              />
-              <span className="text-sm text-booth-muted">{fontSize}px</span>
-            </div>
-          </div>
+        </div>
+        
+        <div>
+          <label htmlFor="fontSize" className="block text-sm font-medium text-booth-muted mb-1">
+            Font Size: {fontSize}px
+          </label>
+          <input
+            type="range"
+            id="fontSize"
+            min="12"
+            max="72"
+            className="w-full"
+            value={fontSize}
+            onChange={(e) => setFontSize(parseInt(e.target.value))}
+          />
         </div>
         
         <div className="flex justify-end space-x-2 pt-2">

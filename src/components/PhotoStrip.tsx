@@ -13,18 +13,21 @@ interface Photo {
     color: string;
     fontSize: number;
   } | null;
+  stickers?: string[];
 }
 
 interface PhotoStripProps {
   photos: Photo[];
   onToggleSelect: (id: number) => void;
   onGenerateStrip: (stripUrl: string) => void;
+  selectedFrame: { type: string; color: string } | null;
 }
 
 const PhotoStrip: React.FC<PhotoStripProps> = ({ 
   photos, 
   onToggleSelect, 
-  onGenerateStrip 
+  onGenerateStrip,
+  selectedFrame
 }) => {
   // Generate the actual photo strip
   const handleCreateStrip = async () => {
@@ -37,13 +40,24 @@ const PhotoStrip: React.FC<PhotoStripProps> = ({
       const imageUrls = selectedPhotos.map(photo => photo.url);
       const textOverlays = selectedPhotos.map(photo => photo.text);
       
+      // Convert frame settings to parameters
+      const borderWidth = selectedFrame?.type === 'none' ? 0 : 
+                          selectedFrame?.type === 'thin' ? 5 :
+                          selectedFrame?.type === 'thick' ? 15 :
+                          selectedFrame?.type === 'polaroid' ? 30 :
+                          selectedFrame?.type === 'rounded' ? 8 : 5;
+      
+      const borderColor = selectedFrame?.color || 'white';
+      const padding = selectedFrame?.type === 'polaroid' ? 40 : 10;
+      const backgroundColor = 'white';
+      
       const stripUrl = await createPhotoStrip(
         imageUrls, 
         'vertical', 
-        10, 
-        'white', 
-        5, 
-        'white',
+        padding, 
+        backgroundColor, 
+        borderWidth, 
+        borderColor,
         textOverlays
       );
       

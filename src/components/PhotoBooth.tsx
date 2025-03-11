@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Camera, Share2, Download, RefreshCw } from 'lucide-react';
+import { Camera, Share2, Download, RefreshCw, Image, Sliders } from 'lucide-react';
 import CameraComponent from './Camera';
 import EditPanel from './EditPanel';
 import PhotoStrip from './PhotoStrip';
-import TextEditor from './TextEditor';
+import FramesPanel from './FramesPanel';
 import { FilterType } from '../utils/filters';
 import { applyFilter, downloadImage } from '../utils/imageUtils';
 
@@ -22,6 +22,13 @@ interface Photo {
     color: string;
     fontSize: number;
   } | null;
+  stickers?: string[];
+  adjustments?: Record<string, number>;
+}
+
+interface Frame {
+  type: string;
+  color: string;
 }
 
 const PhotoBooth: React.FC = () => {
@@ -33,6 +40,8 @@ const PhotoBooth: React.FC = () => {
   const [photoStripUrl, setPhotoStripUrl] = useState<string | null>(null);
   const [captureCount, setCaptureCount] = useState(0);
   const [editingText, setEditingText] = useState(false);
+  const [selectedFrame, setSelectedFrame] = useState<Frame | null>(null);
+  const [currentEditingTab, setCurrentEditingTab] = useState<'photo' | 'strip'>('photo');
   
   // Find the currently editing photo
   const editingPhoto = editingPhotoId !== null 
@@ -48,7 +57,15 @@ const PhotoBooth: React.FC = () => {
       originalUrl: imageDataUrl,
       filter: 'normal',
       selected: photos.filter(p => p.selected).length < 3,
-      text: null
+      text: null,
+      stickers: [],
+      adjustments: {
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        blur: 0,
+        vignette: 0
+      }
     };
     
     setPhotos(prev => [...prev, newPhoto]);
@@ -89,6 +106,32 @@ const PhotoBooth: React.FC = () => {
     }
   };
 
+  // Handle image adjustments (brightness, contrast, etc.)
+  const handleApplyAdjustment = (type: string, value: number) => {
+    if (editingPhotoId === null) return;
+    
+    setPhotos(prev => prev.map(p => {
+      if (p.id === editingPhotoId) {
+        const updatedAdjustments = {
+          ...p.adjustments,
+          [type]: value
+        };
+        
+        return {
+          ...p,
+          adjustments: updatedAdjustments
+        };
+      }
+      return p;
+    }));
+    
+    // In a real implementation, we would apply the adjustment to the image in real-time
+    // This would require extending the imageUtils.ts to handle multiple adjustments
+    toast(`Applied ${type}: ${value}`, {
+      duration: 1000
+    });
+  };
+
   // Add text to the current photo
   const handleAddText = (text: { content: string; x: number; y: number; color: string; fontSize: number }) => {
     if (editingPhotoId === null) return;
@@ -101,6 +144,31 @@ const PhotoBooth: React.FC = () => {
     
     setEditingText(false);
     toast.success('Text added to photo!');
+  };
+  
+  // Add a sticker to the current photo
+  const handleAddSticker = (stickerUrl: string) => {
+    if (editingPhotoId === null) return;
+    
+    setPhotos(prev => prev.map(p => {
+      if (p.id === editingPhotoId) {
+        const updatedStickers = [...(p.stickers || []), stickerUrl];
+        return { ...p, stickers: updatedStickers };
+      }
+      return p;
+    }));
+    
+    toast.success('Sticker added to photo!');
+  };
+  
+  // Handle frame selection for the photo strip
+  const handleSelectFrame = (frameType: string, frameColor: string) => {
+    setSelectedFrame({
+      type: frameType,
+      color: frameColor
+    });
+    
+    toast.success(`Frame updated: ${frameType} - ${frameColor}`);
   };
   
   // Toggle photo selection for the strip
@@ -170,6 +238,7 @@ const PhotoBooth: React.FC = () => {
     setEditingPhotoId(null);
     setSelectedFilter('normal');
     setEditingText(false);
+    setSelectedFrame(null);
     
     toast.success('Started a new session!');
   };
@@ -183,6 +252,11 @@ const PhotoBooth: React.FC = () => {
     }, 1000);
     
     toast.success('Session started! Get ready for your first photo!');
+  };
+
+  // Toggle between photo editing and strip customization
+  const handleToggleEditTab = (tab: 'photo' | 'strip') => {
+    setCurrentEditingTab(tab);
   };
   
   // Render the current mode content
@@ -228,56 +302,85 @@ const PhotoBooth: React.FC = () => {
       case 'edit':
         return (
           <div className="animate-fade-in">
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex rounded-lg bg-booth-secondary/40 p-1">
+                <button
+                  className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${
+                    currentEditingTab === 'photo' 
+                      ? 'bg-white text-booth-primary shadow-sm' 
+                      : 'text-booth-muted hover:text-booth-primary'
+                  }`}
+                  onClick={() => handleToggleEditTab('photo')}
+                >
+                  <Image size={16} />
+                  <span>Edit Photos</span>
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${
+                    currentEditingTab === 'strip' 
+                      ? 'bg-white text-booth-primary shadow-sm' 
+                      : 'text-booth-muted hover:text-booth-primary'
+                  }`}
+                  onClick={() => handleToggleEditTab('strip')}
+                >
+                  <Sliders size={16} />
+                  <span>Customize Strip</span>
+                </button>
+              </div>
+            </div>
+            
             <div className="flex flex-col md:flex-row gap-6">
               <div className="md:w-1/2">
-                <h3 className="text-lg font-medium text-booth-primary mb-3">Edit Your Photos</h3>
-                
-                <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-4">
-                  {photos.map((photo) => (
-                    <div 
-                      key={photo.id}
-                      className={`
-                        photo-thumbnail cursor-pointer
-                        ${editingPhotoId === photo.id ? 'ring-2 ring-booth-accent ring-offset-2' : ''}
-                      `}
-                      onClick={() => {
-                        setEditingPhotoId(photo.id);
-                        setSelectedFilter(photo.filter);
-                      }}
-                    >
-                      <img 
-                        src={photo.url}
-                        alt={`Photo ${photo.id}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-                
-                {editingPhoto && !editingText && (
-                  <div className="space-y-4">
-                    <EditPanel
-                      imageUrl={editingPhoto.originalUrl}
-                      onApplyFilter={handleApplyFilter}
-                      selectedFilter={selectedFilter}
-                    />
+                {currentEditingTab === 'photo' && (
+                  <>
+                    <h3 className="text-lg font-medium text-booth-primary mb-3">Edit Your Photos</h3>
                     
-                    <div className="py-2">
-                      <button 
-                        className="px-4 py-2 bg-booth-secondary text-booth-primary rounded-lg hover:bg-booth-secondary/80 transition-colors"
-                        onClick={() => setEditingText(true)}
-                      >
-                        Add Text
-                      </button>
+                    <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-4">
+                      {photos.map((photo) => (
+                        <div 
+                          key={photo.id}
+                          className={`
+                            photo-thumbnail cursor-pointer
+                            ${editingPhotoId === photo.id ? 'ring-2 ring-booth-accent ring-offset-2' : ''}
+                          `}
+                          onClick={() => {
+                            setEditingPhotoId(photo.id);
+                            setSelectedFilter(photo.filter);
+                          }}
+                        >
+                          <img 
+                            src={photo.url}
+                            alt={`Photo ${photo.id}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                    
+                    {editingPhoto && !editingText && (
+                      <EditPanel
+                        imageUrl={editingPhoto.originalUrl}
+                        onApplyFilter={handleApplyFilter}
+                        selectedFilter={selectedFilter}
+                        onApplyAdjustment={handleApplyAdjustment}
+                        onAddText={handleAddText}
+                        onAddSticker={handleAddSticker}
+                        onSelectFrame={handleSelectFrame}
+                        selectedFrame={selectedFrame}
+                        onCancelTextEdit={() => setEditingText(false)}
+                      />
+                    )}
+                  </>
                 )}
                 
-                {editingPhoto && editingText && (
-                  <TextEditor 
-                    onAddText={handleAddText}
-                    onCancel={() => setEditingText(false)}
-                  />
+                {currentEditingTab === 'strip' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-booth-primary mb-3">Customize Your Strip</h3>
+                    <FramesPanel
+                      onSelectFrame={handleSelectFrame}
+                      selectedFrame={selectedFrame}
+                    />
+                  </div>
                 )}
               </div>
               
@@ -286,6 +389,7 @@ const PhotoBooth: React.FC = () => {
                   photos={photos}
                   onToggleSelect={handleToggleSelect}
                   onGenerateStrip={handleGenerateStrip}
+                  selectedFrame={selectedFrame}
                 />
               </div>
             </div>

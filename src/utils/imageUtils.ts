@@ -83,6 +83,113 @@ export const applyFilter = (
   });
 };
 
+// Apply adjustments like brightness, contrast, etc.
+export const applyAdjustments = (
+  imageDataUrl: string,
+  adjustments: Record<string, number>,
+  width: number = 640,
+  height: number = 480
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        
+        // Draw the image to canvas
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Apply adjustments
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        
+        // Apply brightness
+        const brightness = (adjustments.brightness || 100) / 100;
+        
+        // Apply contrast
+        const contrast = (adjustments.contrast || 100) / 100;
+        const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+        
+        // Apply saturation
+        const saturation = (adjustments.saturation || 100) / 100;
+        
+        // Apply adjustments to each pixel
+        for (let i = 0; i < data.length; i += 4) {
+          // Apply brightness
+          data[i] = data[i] * brightness;
+          data[i + 1] = data[i + 1] * brightness;
+          data[i + 2] = data[i + 2] * brightness;
+          
+          // Apply contrast
+          data[i] = factor * (data[i] - 128) + 128;
+          data[i + 1] = factor * (data[i + 1] - 128) + 128;
+          data[i + 2] = factor * (data[i + 2] - 128) + 128;
+          
+          // Apply saturation
+          const gray = 0.2989 * data[i] + 0.5870 * data[i + 1] + 0.1140 * data[i + 2];
+          data[i] = gray * (1 - saturation) + data[i] * saturation;
+          data[i + 1] = gray * (1 - saturation) + data[i + 1] * saturation;
+          data[i + 2] = gray * (1 - saturation) + data[i + 2] * saturation;
+          
+          // Clamp values
+          data[i] = Math.min(255, Math.max(0, data[i]));
+          data[i + 1] = Math.min(255, Math.max(0, data[i + 1]));
+          data[i + 2] = Math.min(255, Math.max(0, data[i + 2]));
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Apply blur if needed
+        if (adjustments.blur && adjustments.blur > 0) {
+          ctx.filter = `blur(${adjustments.blur}px)`;
+          ctx.drawImage(canvas, 0, 0);
+          ctx.filter = 'none';
+        }
+        
+        // Apply vignette if needed
+        if (adjustments.vignette && adjustments.vignette > 0) {
+          const vignetteStrength = adjustments.vignette / 100;
+          
+          // Create gradient for vignette
+          const gradient = ctx.createRadialGradient(
+            width / 2, height / 2, 0,
+            width / 2, height / 2, Math.sqrt(Math.pow(width / 2, 2) + Math.pow(height / 2, 2))
+          );
+          
+          gradient.addColorStop(0, 'rgba(0,0,0,0)');
+          gradient.addColorStop(0.5, 'rgba(0,0,0,0)');
+          gradient.addColorStop(1, `rgba(0,0,0,${vignetteStrength})`);
+          
+          ctx.fillStyle = gradient;
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.fillRect(0, 0, width, height);
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        
+        // Get the adjusted image data URL
+        const dataUrl = canvas.toDataURL('image/png');
+        resolve(dataUrl);
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image for adjustments'));
+      };
+      
+      img.src = imageDataUrl;
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 // Create a photo strip from selected images
 export const createPhotoStrip = (
   imageDataUrls: string[],
@@ -149,16 +256,56 @@ export const createPhotoStrip = (
           ctx.fillStyle = backgroundColor;
           ctx.fillRect(0, 0, stripWidth, stripHeight);
           
-          // Draw border if needed
-          if (borderWidth > 0) {
-            ctx.strokeStyle = borderColor;
-            ctx.lineWidth = borderWidth;
-            ctx.strokeRect(
-              borderWidth / 2, 
-              borderWidth / 2, 
-              stripWidth - borderWidth, 
-              stripHeight - borderWidth
-            );
+          // Add special borders based on frame type
+          const frameType = borderWidth > 0 ? 'custom' : 'none';
+          
+          if (frameType === 'custom') {
+            // Draw border
+            if (borderWidth > 0) {
+              ctx.strokeStyle = borderColor;
+              ctx.lineWidth = borderWidth;
+              
+              // Check if it's a rounded frame
+              if (borderColor.includes('rounded')) {
+                const radius = 15;
+                ctx.beginPath();
+                ctx.moveTo(borderWidth / 2 + radius, borderWidth / 2);
+                ctx.lineTo(stripWidth - borderWidth / 2 - radius, borderWidth / 2);
+                ctx.arcTo(stripWidth - borderWidth / 2, borderWidth / 2, stripWidth - borderWidth / 2, borderWidth / 2 + radius, radius);
+                ctx.lineTo(stripWidth - borderWidth / 2, stripHeight - borderWidth / 2 - radius);
+                ctx.arcTo(stripWidth - borderWidth / 2, stripHeight - borderWidth / 2, stripWidth - borderWidth / 2 - radius, stripHeight - borderWidth / 2, radius);
+                ctx.lineTo(borderWidth / 2 + radius, stripHeight - borderWidth / 2);
+                ctx.arcTo(borderWidth / 2, stripHeight - borderWidth / 2, borderWidth / 2, stripHeight - borderWidth / 2 - radius, radius);
+                ctx.lineTo(borderWidth / 2, borderWidth / 2 + radius);
+                ctx.arcTo(borderWidth / 2, borderWidth / 2, borderWidth / 2 + radius, borderWidth / 2, radius);
+                ctx.closePath();
+                ctx.stroke();
+              } else {
+                // Regular rectangular border
+                ctx.strokeRect(
+                  borderWidth / 2, 
+                  borderWidth / 2, 
+                  stripWidth - borderWidth, 
+                  stripHeight - borderWidth
+                );
+              }
+            }
+            
+            // For Polaroid-style, add extra bottom padding
+            if (padding >= 30) {
+              ctx.fillStyle = backgroundColor;
+              if (orientation === 'vertical') {
+                images.forEach((img, index) => {
+                  const y = padding + borderWidth + (index * (imgHeight + padding));
+                  ctx.fillRect(
+                    borderWidth,
+                    y + imgHeight,
+                    imgWidth + padding,
+                    padding * 1.5
+                  );
+                });
+              }
+            }
           }
           
           // Draw each image and add text if present
@@ -206,6 +353,48 @@ export const createPhotoStrip = (
               ctx.shadowOffsetY = 0;
             }
           });
+          
+          // For film strip style, add sprocket holes
+          if (borderColor.includes('filmstrip')) {
+            // Add film strip sprocket holes
+            ctx.fillStyle = 'black';
+            const holeRadius = 8;
+            const holeMargin = 20;
+            
+            if (orientation === 'vertical') {
+              // Left side holes
+              for (let i = 0; i <= images.length; i++) {
+                const y = padding + borderWidth + (i * (imgHeight + padding));
+                ctx.beginPath();
+                ctx.arc(holeMargin, y - holeRadius, holeRadius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              
+              // Right side holes
+              for (let i = 0; i <= images.length; i++) {
+                const y = padding + borderWidth + (i * (imgHeight + padding));
+                ctx.beginPath();
+                ctx.arc(stripWidth - holeMargin, y - holeRadius, holeRadius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            } else {
+              // Top holes
+              for (let i = 0; i <= images.length; i++) {
+                const x = padding + borderWidth + (i * (imgWidth + padding));
+                ctx.beginPath();
+                ctx.arc(x - holeRadius, holeMargin, holeRadius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              
+              // Bottom holes
+              for (let i = 0; i <= images.length; i++) {
+                const x = padding + borderWidth + (i * (imgWidth + padding));
+                ctx.beginPath();
+                ctx.arc(x - holeRadius, stripHeight - holeMargin, holeRadius, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          }
           
           // Get the final strip as data URL
           const dataUrl = canvas.toDataURL('image/png');
