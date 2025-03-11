@@ -43,6 +43,13 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Photo booth specific variables */
+    --booth-primary: 240 5.9% 10%;
+    --booth-secondary: 210 40% 96.1%;
+    --booth-accent: 262.1 83.3% 57.8%; /* Purple for accent */
+    --booth-muted: 220 14.3% 75.1%;
+    --booth-border: 220 13% 91%;
   }
 
   .dark {
@@ -82,6 +89,13 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Photo booth specific variables for dark mode */
+    --booth-primary: 0 0% 98%;
+    --booth-secondary: 217.2 32.6% 17.5%;
+    --booth-accent: 262.1 83.3% 57.8%; /* Keep purple for accent */
+    --booth-muted: 215 20.2% 65.1%;
+    --booth-border: 217.2 32.6% 17.5%;
   }
 }
 
@@ -110,7 +124,7 @@
   }
   
   .camera-container {
-    @apply relative overflow-hidden rounded-xl;
+    @apply relative overflow-hidden rounded-xl aspect-video;
   }
   
   .photo-strip {
@@ -132,5 +146,60 @@
   
   .photo-thumbnail.selected {
     @apply border-booth-accent shadow-md;
+  }
+  
+  /* Define keyframes for camera flash animation */
+  @keyframes camera-flash {
+    0% { opacity: 0; }
+    25% { opacity: 1; }
+    50% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  
+  /* Define animation for camera flash */
+  .animate-camera-flash {
+    animation: camera-flash 0.3s ease-out;
+  }
+  
+  /* Define keyframes for countdown animation */
+  @keyframes countdown {
+    0% { transform: scale(1.5); opacity: 0; }
+    10% { transform: scale(1); opacity: 1; }
+    90% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.5); opacity: 0; }
+  }
+  
+  .animate-countdown {
+    animation: countdown 1s ease-out;
+  }
+  
+  /* Define keyframes for scale-in animation */
+  @keyframes scale-in {
+    0% { transform: scale(0.9); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+  
+  /* Define keyframes for slide-up animation */
+  @keyframes slide-up {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+  
+  /* Define keyframes for fade-in animation */
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
   }
 }

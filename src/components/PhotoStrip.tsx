@@ -2,8 +2,21 @@
 import React from 'react';
 import { createPhotoStrip } from '../utils/imageUtils';
 
+interface Photo {
+  id: number;
+  url: string;
+  selected: boolean;
+  text?: {
+    content: string;
+    x: number;
+    y: number;
+    color: string;
+    fontSize: number;
+  } | null;
+}
+
 interface PhotoStripProps {
-  photos: { id: number; url: string; selected: boolean }[];
+  photos: Photo[];
   onToggleSelect: (id: number) => void;
   onGenerateStrip: (stripUrl: string) => void;
 }
@@ -22,13 +35,16 @@ const PhotoStrip: React.FC<PhotoStripProps> = ({
       }
       
       const imageUrls = selectedPhotos.map(photo => photo.url);
+      const textOverlays = selectedPhotos.map(photo => photo.text);
+      
       const stripUrl = await createPhotoStrip(
         imageUrls, 
         'vertical', 
         10, 
         'white', 
         5, 
-        'white'
+        'white',
+        textOverlays
       );
       
       onGenerateStrip(stripUrl);
@@ -50,7 +66,7 @@ const PhotoStrip: React.FC<PhotoStripProps> = ({
           <div 
             key={photo.id}
             className={`
-              photo-thumbnail cursor-pointer aspect-[3/4]
+              photo-thumbnail cursor-pointer aspect-[3/4] relative
               ${photo.selected ? 'selected scale-105' : ''}
             `}
             onClick={() => onToggleSelect(photo.id)}
@@ -60,6 +76,19 @@ const PhotoStrip: React.FC<PhotoStripProps> = ({
               alt={`Photo ${photo.id}`}
               className="w-full h-full object-cover"
             />
+            {photo.text && photo.text.content && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span 
+                  style={{
+                    color: photo.text.color,
+                    fontSize: `${photo.text.fontSize / 2}px`, // Scale down for thumbnail
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.7)'
+                  }}
+                >
+                  {photo.text.content}
+                </span>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import Camera from './Camera';
+import { Camera, Share2, Download, RefreshCw } from 'lucide-react';
+import CameraComponent from './Camera';
 import EditPanel from './EditPanel';
 import PhotoStrip from './PhotoStrip';
+import TextEditor from './TextEditor';
 import { FilterType } from '../utils/filters';
 import { applyFilter, downloadImage } from '../utils/imageUtils';
 
@@ -13,16 +15,24 @@ interface Photo {
   originalUrl: string;
   filter: FilterType;
   selected: boolean;
+  text?: {
+    content: string;
+    x: number;
+    y: number;
+    color: string;
+    fontSize: number;
+  } | null;
 }
 
 const PhotoBooth: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [currentMode, setCurrentMode] = useState<'capture' | 'edit' | 'strip'>('capture');
+  const [currentMode, setCurrentMode] = useState<'welcome' | 'capture' | 'edit' | 'strip'>('welcome');
   const [capturingPhoto, setCapturingPhoto] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('normal');
   const [editingPhotoId, setEditingPhotoId] = useState<number | null>(null);
   const [photoStripUrl, setPhotoStripUrl] = useState<string | null>(null);
   const [captureCount, setCaptureCount] = useState(0);
+  const [editingText, setEditingText] = useState(false);
   
   // Find the currently editing photo
   const editingPhoto = editingPhotoId !== null 
@@ -37,7 +47,8 @@ const PhotoBooth: React.FC = () => {
       url: imageDataUrl,
       originalUrl: imageDataUrl,
       filter: 'normal',
-      selected: photos.filter(p => p.selected).length < 3
+      selected: photos.filter(p => p.selected).length < 3,
+      text: null
     };
     
     setPhotos(prev => [...prev, newPhoto]);
@@ -77,6 +88,20 @@ const PhotoBooth: React.FC = () => {
       toast.error('Failed to apply filter');
     }
   };
+
+  // Add text to the current photo
+  const handleAddText = (text: { content: string; x: number; y: number; color: string; fontSize: number }) => {
+    if (editingPhotoId === null) return;
+    
+    setPhotos(prev => prev.map(p => 
+      p.id === editingPhotoId 
+        ? { ...p, text }
+        : p
+    ));
+    
+    setEditingText(false);
+    toast.success('Text added to photo!');
+  };
   
   // Toggle photo selection for the strip
   const handleToggleSelect = (photoId: number) => {
@@ -109,40 +134,83 @@ const PhotoBooth: React.FC = () => {
     downloadImage(photoStripUrl, 'my-photo-booth-strip.png');
     toast.success('Photo strip downloaded!');
   };
+
+  // Handle photo strip sharing
+  const handleShareStrip = () => {
+    if (!photoStripUrl) return;
+    
+    if (navigator.share) {
+      fetch(photoStripUrl)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], 'my-photo-booth-strip.png', { type: 'image/png' });
+          navigator.share({
+            title: 'My Photo Booth Strip',
+            text: 'Check out my photo booth strip!',
+            files: [file]
+          }).then(() => {
+            toast.success('Shared successfully!');
+          }).catch(error => {
+            console.error('Error sharing:', error);
+            toast.error('Failed to share');
+          });
+        });
+    } else {
+      toast.error('Web Share API not supported in your browser');
+    }
+  };
   
   // Start a new session
   const handleNewSession = () => {
     setPhotos([]);
     setPhotoStripUrl(null);
-    setCurrentMode('capture');
+    setCurrentMode('welcome');
     setCaptureCount(0);
     setCapturingPhoto(false);
     setEditingPhotoId(null);
     setSelectedFilter('normal');
-    
-    setTimeout(() => {
-      setCapturingPhoto(true);
-    }, 500);
+    setEditingText(false);
     
     toast.success('Started a new session!');
   };
-  
-  // Start capturing photos on first load
-  useEffect(() => {
-    if (photos.length === 0 && currentMode === 'capture') {
-      setTimeout(() => {
-        setCapturingPhoto(true);
-      }, 1000);
-    }
-  }, [photos.length, currentMode]);
 
+  // Start the photo booth session
+  const handleStartSession = () => {
+    setCurrentMode('capture');
+    
+    setTimeout(() => {
+      setCapturingPhoto(true);
+    }, 1000);
+    
+    toast.success('Session started! Get ready for your first photo!');
+  };
+  
   // Render the current mode content
   const renderContent = () => {
     switch (currentMode) {
+      case 'welcome':
+        return (
+          <div className="flex flex-col items-center justify-center animate-fade-in py-12">
+            <div className="w-24 h-24 rounded-full bg-booth-accent flex items-center justify-center mb-6 shadow-lg">
+              <Camera size={48} className="text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-booth-primary mb-4">Welcome to the Photo Booth!</h2>
+            <p className="text-booth-muted max-w-md text-center mb-8">
+              Take 4 photos, apply cool filters, and create your own photo strip to download and share!
+            </p>
+            <button
+              className="px-8 py-4 rounded-full font-medium bg-booth-accent text-white shadow-lg hover:shadow-xl transition-all text-lg"
+              onClick={handleStartSession}
+            >
+              Start Session
+            </button>
+          </div>
+        );
+        
       case 'capture':
         return (
           <div className="animate-fade-in">
-            <Camera 
+            <CameraComponent 
               onCapture={handlePhotoCapture} 
               isCapturing={capturingPhoto} 
               countdownSeconds={5}
@@ -186,11 +254,29 @@ const PhotoBooth: React.FC = () => {
                   ))}
                 </div>
                 
-                {editingPhoto && (
-                  <EditPanel
-                    imageUrl={editingPhoto.originalUrl}
-                    onApplyFilter={handleApplyFilter}
-                    selectedFilter={selectedFilter}
+                {editingPhoto && !editingText && (
+                  <div className="space-y-4">
+                    <EditPanel
+                      imageUrl={editingPhoto.originalUrl}
+                      onApplyFilter={handleApplyFilter}
+                      selectedFilter={selectedFilter}
+                    />
+                    
+                    <div className="py-2">
+                      <button 
+                        className="px-4 py-2 bg-booth-secondary text-booth-primary rounded-lg hover:bg-booth-secondary/80 transition-colors"
+                        onClick={() => setEditingText(true)}
+                      >
+                        Add Text
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {editingPhoto && editingText && (
+                  <TextEditor 
+                    onAddText={handleAddText}
+                    onCancel={() => setEditingText(false)}
                   />
                 )}
               </div>
@@ -221,18 +307,28 @@ const PhotoBooth: React.FC = () => {
               </div>
             )}
             
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap justify-center">
               <button
-                className="px-6 py-3 rounded-full font-medium bg-booth-accent text-white shadow-lg hover:shadow-xl transition-all"
+                className="px-6 py-3 rounded-full font-medium bg-booth-accent text-white shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
                 onClick={handleDownloadStrip}
               >
+                <Download size={18} />
                 Download
               </button>
               
               <button
-                className="px-6 py-3 rounded-full font-medium bg-booth-muted text-white shadow hover:shadow-md transition-all"
+                className="px-6 py-3 rounded-full font-medium bg-booth-primary text-white shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                onClick={handleShareStrip}
+              >
+                <Share2 size={18} />
+                Share
+              </button>
+              
+              <button
+                className="px-6 py-3 rounded-full font-medium bg-booth-muted text-white shadow hover:shadow-md transition-all flex items-center gap-2"
                 onClick={handleNewSession}
               >
+                <RefreshCw size={18} />
                 New Session
               </button>
             </div>

@@ -90,7 +90,14 @@ export const createPhotoStrip = (
   padding: number = 10,
   backgroundColor: string = 'white',
   borderWidth: number = 5,
-  borderColor: string = 'white'
+  borderColor: string = 'white',
+  textOverlays: Array<{ 
+    content: string; 
+    x: number; 
+    y: number; 
+    color: string; 
+    fontSize: number 
+  } | null> = []
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
@@ -154,7 +161,7 @@ export const createPhotoStrip = (
             );
           }
           
-          // Draw each image
+          // Draw each image and add text if present
           images.forEach((img, index) => {
             let x: number;
             let y: number;
@@ -167,7 +174,37 @@ export const createPhotoStrip = (
               y = padding + borderWidth;
             }
             
+            // Draw the image
             ctx.drawImage(img, x, y, imgWidth, imgHeight);
+            
+            // Draw text overlay if present for this image
+            const textOverlay = textOverlays[index];
+            if (textOverlay && textOverlay.content) {
+              // Set text properties
+              ctx.font = `${textOverlay.fontSize}px Arial`;
+              ctx.fillStyle = textOverlay.color;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              
+              // Calculate text position based on percentage coordinates
+              const textX = x + (imgWidth * (textOverlay.x / 100));
+              const textY = y + (imgHeight * (textOverlay.y / 100));
+              
+              // Add a text shadow/outline for better visibility
+              ctx.shadowColor = 'rgba(0,0,0,0.5)';
+              ctx.shadowBlur = 4;
+              ctx.shadowOffsetX = 1;
+              ctx.shadowOffsetY = 1;
+              
+              // Draw the text
+              ctx.fillText(textOverlay.content, textX, textY);
+              
+              // Reset shadow
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
+            }
           });
           
           // Get the final strip as data URL
